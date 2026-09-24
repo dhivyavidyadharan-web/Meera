@@ -73,7 +73,16 @@ Note the deployment URL it prints, e.g. `https://meera-notes-bot.vercel.app`.
 
 ## 5. Point the Telegram bot at your Vercel URL
 
-Run this once from your own machine (not on Vercel):
+**First, turn off Vercel Deployment Protection**, or Telegram gets redirected to a
+Vercel login page and never reaches the bot: Project → Settings → Deployment
+Protection → Vercel Authentication → Disabled → Save.
+
+Then open `https://<your-production-domain>/api/setup` in a browser (add
+`?key=<TELEGRAM_WEBHOOK_SECRET>` if you set one). It checks the env vars,
+Telegram, and Gemini, registers the webhook using the server's own keys, and
+shows Telegram's last delivery error if any.
+
+Alternatively, run this once from your own machine:
 
 ```bash
 TELEGRAM_BOT_TOKEN=xxx DEPLOY_URL=https://meera-notes-bot.vercel.app TELEGRAM_WEBHOOK_SECRET=yyy node scripts/set-webhook.js
@@ -103,6 +112,6 @@ should reply with a drafted post in a few seconds.
 - **Editing instructions later:** just edit `config/instructions.md` and
   redeploy (`vercel --prod`), or set the `WRITING_INSTRUCTIONS` env var in
   the Vercel dashboard for a no-redeploy update.
-- **Changing the Gemini model:** set `GEMINI_MODEL` (default `gemini-2.5-flash`).
+- **Changing the Gemini model:** set `GEMINI_MODEL` (default `gemini-flash-latest`).
 - If you ever need to move the webhook to a new URL, just re-run
   `scripts/set-webhook.js` with the new `DEPLOY_URL` — no need to delete first.

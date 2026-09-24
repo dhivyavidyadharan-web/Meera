@@ -6,7 +6,6 @@ const { sendMessage, sendChatAction } = require("../lib/telegram");
 let cachedInstructions = null;
 
 function loadInstructions() {
-  // Env var takes priority so instructions can be updated without a redeploy.
   if (process.env.WRITING_INSTRUCTIONS) {
     return process.env.WRITING_INSTRUCTIONS;
   }
@@ -15,6 +14,42 @@ function loadInstructions() {
   const filePath = path.join(process.cwd(), "config", "instructions.md");
   cachedInstructions = fs.readFileSync(filePath, "utf8");
   return cachedInstructions;
+}
+
+async function handleUpdate(update) {
+  const message = update?.message || update?.edited_message;
+  const chatId = message?.chat?.id;
+  const text = message?.text;
+
+  if (!chatId) return;
+
+  if (!text) {
+    await sendMessage(
+      chatId,
+      "I can only work with text notes right now. Send the note as a text message and I'll draft a LinkedIn post from it."
+    );
+    return;
+  }
+
+  if (text.startsWith("/start")) {
+    await sendMessage(
+      chatId,
+      "Hi! Send me your seed data (a story, a number, a mentor moment) and I'll turn it into a LinkedIn post in your voice."
+    );
+    return;
+  }
+
+  try {
+    await sendChatAction(chatId, "typing");
+    const draft = await draftPost({ note: text, instructions: loadInstructions() });
+    await sendMessage(chatId, draft);
+  } catch (err) {
+    console.error("Draft failed:", err);
+    await sendMessage(
+      chatId,
+      "Something went wrong drafting that one. Please try again in a minute."
+    );
+  }
 }
 
 module.exports = async (req, res) => {
@@ -28,62 +63,19 @@ module.exports = async (req, res) => {
     return;
   }
 
-  // Optional shared-secret check. Set TELEGRAM_WEBHOOK_SECRET and pass the
-  // same value as secret_token when registering the webhook (see scripts/set-webhook.js).
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
-  if (expectedSecret) {
-    const gotSecret = req.headers["x-telegram-bot-api-secret-token"];
-    if (gotSecret !== expectedSecret) {
-      res.status(401).send("Unauthorized");
-      return;
-    }
+  if (expectedSecret && req.headers["x-telegram-bot-api-secret-token"] !== expectedSecret) {
+    res.status(401).send("Unauthorized");
+    return;
   }
 
-  // Always 200 back to Telegram quickly-ish so it doesn't retry the same update.
-  res.status(200).send("ok");
-
+  // Vercel may freeze the function once the response is sent, so finish all work first.
   try {
-    const update = req.body;
-    const message = update?.message || update?.edited_message;
-    const chatId = message?.chat?.id;
-    const text = message?.text;
-
-    if (!chatId) return;
-
-    if (!text) {
-      await sendMessage(
-        chatId,
-        "I can only work with text notes right now — send me the note as a text message and I'll draft a post from it."
-      );
-      return;
-    }
-
-    if (text.startsWith("/start")) {
-      await sendMessage(
-        chatId,
-        "Hi! Send me a note and I'll draft it into a post in your voice."
-      );
-      return;
-    }
-
-    await sendChatAction(chatId, "typing");
-
-    const instructions = loadInstructions();
-    const draft = await draftPost({ note: text, instructions });
-
-    await sendMessage(chatId, draft);
+    await handleUpdate(req.body);
   } catch (err) {
     console.error("Webhook error:", err);
-    try {
-      const chatId = req.body?.message?.chat?.id;
-      if (chatId) {
-        await sendMessage(
-          chatId,
-          "Something went wrong drafting that one — mind trying again in a bit?"
-        );
-      }
-    } catch (sendErr) {
-      console.error("Failed to notify chat of error:", sendErr);
-    }
   }
+
+  // Always 200 so Telegram doesn't retry the same update in a loop.
+  res.status(200).send("ok");
 };
