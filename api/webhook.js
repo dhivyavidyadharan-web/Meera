@@ -4,6 +4,7 @@ const { draftPost, generate } = require("../lib/gemini");
 const { sendMessage, sendChatAction } = require("../lib/telegram");
 const { getHistory, addTurns, clearHistory } = require("../lib/history");
 const { scoreKeywords, formatScores } = require("../lib/keywords");
+const { findProblems, tidy } = require("../lib/structure");
 
 const MAX_HEADLINES = 6;
 
@@ -44,6 +45,31 @@ function formatSources(articles) {
     "Sources used",
     ...articles.map((a) => `\n${a.title}\n${a.source}, ${ageLabel(a.ageDays)}\n${a.link}`),
   ].join("\n");
+}
+
+// One revision pass at most, so a stubborn draft can't loop or blow the time limit.
+async function enforceStructure(draft, turns) {
+  const problems = findProblems(tidy(draft));
+  if (problems.length === 0) return tidy(draft);
+
+  try {
+    const revised = await generate({
+      system: loadInstructions(),
+      turns: [
+        ...turns,
+        { role: "model", text: draft },
+        {
+          role: "user",
+          text: `Revise this post to follow the POST STRUCTURE rules. Fix:\n- ${problems.join("\n- ")}\nKeep the same facts, sources and voice. Return only the revised post text.`,
+        },
+      ],
+      temperature: 0.4,
+    });
+    return tidy(revised);
+  } catch (err) {
+    console.error("Structure revision failed, sending first draft:", err);
+    return tidy(draft);
+  }
 }
 
 let cachedInstructions = null;
@@ -111,7 +137,8 @@ async function handleUpdate(update) {
     }
 
     if (ranked.length === 0) {
-      const draft = await draftPost({ note: text, instructions: loadInstructions(), history });
+      const first = await draftPost({ note: text, instructions: loadInstructions(), history });
+      const draft = await enforceStructure(first, turns);
       addTurns(chatId, { role: "user", text }, { role: "model", text: draft });
       await sendMessage(chatId, draft, replyOpts);
       return;
@@ -122,11 +149,13 @@ async function handleUpdate(update) {
 
     const top = ranked[0];
     const headlines = top.articles.slice(0, MAX_HEADLINES);
-    const { post, used_headlines } = await generate({
+    const draftTurns = [...history, { role: "user", text: withNewsContext(text, top.keyword, headlines) }];
+    const { post: first, used_headlines } = await generate({
       system: loadInstructions(),
-      turns: [...history, { role: "user", text: withNewsContext(text, top.keyword, headlines) }],
+      turns: draftTurns,
       jsonSchema: DRAFT_SCHEMA,
     });
+    const post = await enforceStructure(first, draftTurns);
 
     addTurns(chatId, { role: "user", text }, { role: "model", text: post });
     await sendMessage(chatId, post, replyOpts);
