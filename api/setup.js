@@ -47,6 +47,21 @@ module.exports = async (req, res) => {
 
     report.gemini = await checkGemini();
 
+    const before = await telegram("getWebhookInfo");
+    report.webhook_before_setup = {
+      url: before.result?.url,
+      pending_update_count: before.result?.pending_update_count,
+      last_error_date: before.result?.last_error_date
+        ? new Date(before.result.last_error_date * 1000).toISOString()
+        : null,
+      last_error_message: before.result?.last_error_message || null,
+    };
+
+    if (req.query.check === "1") {
+      res.status(200).json(report);
+      return;
+    }
+
     const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || req.headers.host;
     const webhookUrl = `https://${host}/api/webhook`;
     const set = await telegram("setWebhook", {
