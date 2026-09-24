@@ -17,11 +17,19 @@ function loadInstructions() {
 }
 
 async function handleUpdate(update) {
-  const message = update?.message || update?.edited_message;
+  const isChannel = Boolean(update?.channel_post);
+  const message = update?.message || update?.edited_message || update?.channel_post;
   const chatId = message?.chat?.id;
   const text = message?.text;
 
   if (!chatId) return;
+
+  // The bot's drafts in a channel are posted as replies; skipping replies prevents it drafting from its own output.
+  if (isChannel && message.reply_to_message) return;
+
+  const replyOpts = isChannel
+    ? { reply_parameters: { message_id: message.message_id, allow_sending_without_reply: true } }
+    : {};
 
   if (!text) {
     await sendMessage(
@@ -42,12 +50,13 @@ async function handleUpdate(update) {
   try {
     await sendChatAction(chatId, "typing");
     const draft = await draftPost({ note: text, instructions: loadInstructions() });
-    await sendMessage(chatId, draft);
+    await sendMessage(chatId, draft, replyOpts);
   } catch (err) {
     console.error("Draft failed:", err);
     await sendMessage(
       chatId,
-      "Something went wrong drafting that one. Please try again in a minute."
+      "Something went wrong drafting that one. Please try again in a minute.",
+      replyOpts
     );
   }
 }

@@ -66,7 +66,7 @@ module.exports = async (req, res) => {
     const webhookUrl = `https://${host}/api/webhook`;
     const set = await telegram("setWebhook", {
       url: webhookUrl,
-      allowed_updates: ["message", "edited_message"],
+      allowed_updates: ["message", "edited_message", "channel_post"],
       drop_pending_updates: true,
       ...(secret ? { secret_token: secret } : {}),
     });
