@@ -34,7 +34,7 @@ async function handleUpdate(update) {
   if (text.startsWith("/start")) {
     await sendMessage(
       chatId,
-      "Hi! Send me your seed data (a story, a number, a mentor moment) and I'll turn it into a LinkedIn post in your voice."
+      "Hi Meera. Send me a note (a data point, a story, a customer question) and I'll draft a LinkedIn post from it in your voice."
     );
     return;
   }
