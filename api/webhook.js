@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { draftPost } = require("../lib/gemini");
 const { sendMessage, sendChatAction } = require("../lib/telegram");
+const { getHistory, addTurns, clearHistory } = require("../lib/history");
 
 let cachedInstructions = null;
 
@@ -39,17 +40,27 @@ async function handleUpdate(update) {
     return;
   }
 
-  if (text.startsWith("/start")) {
+  if (text.startsWith("/start") || text.startsWith("/new")) {
+    clearHistory(chatId);
     await sendMessage(
       chatId,
-      "Hi Meera. Send me a note (a data point, a story, a customer question) and I'll draft a LinkedIn post from it in your voice."
+      "Hi Meera. Send me a note (a data point, a story, a customer question) and I'll draft a LinkedIn post from it in your voice. Send /new any time to start a fresh topic.",
+      replyOpts
     );
     return;
   }
 
   try {
     await sendChatAction(chatId, "typing");
-    const draft = await draftPost({ note: text, instructions: loadInstructions() });
+
+    let history = getHistory(chatId);
+    const quoted = message.reply_to_message?.text;
+    if (quoted && !history.some((t) => t.text === quoted)) {
+      history = [...history, { role: "model", text: quoted }];
+    }
+
+    const draft = await draftPost({ note: text, instructions: loadInstructions(), history });
+    addTurns(chatId, { role: "user", text }, { role: "model", text: draft });
     await sendMessage(chatId, draft, replyOpts);
   } catch (err) {
     console.error("Draft failed:", err);
