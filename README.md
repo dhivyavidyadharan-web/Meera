@@ -14,10 +14,32 @@ Meera --(text message)--> Telegram bot --(webhook)--> Vercel function
                                               Telegram bot --(reply)--> Meera
 ```
 
+## Keyword scoring + Google News
+
+For every note, the bot:
+
+1. Asks Gemini for 3-5 keywords in the note, each with a **voice fit** rating
+   (0-10) against Meera's themes (formulation, pH, labels vs reality,
+   documentation, India climate, specific actives).
+2. Searches Google News RSS (India edition, last 7 days) for each keyword as an
+   exact phrase, keeping only articles whose headline contains the keyword.
+3. Scores **news** 0-100: each article counts less as it ages (half-life 2 days),
+   and the total saturates so a few fresh articles already score well.
+4. **Total = 50% news + 50% voice fit.** Sends a score table, writes the post
+   around the top keyword using 1-2 relevant headlines as a timely hook, then
+   sends the links for the headlines actually used.
+
+If a note has no clear topic, or Google News is unreachable, the bot skips
+scoring and drafts as before. Weights live in `lib/keywords.js`; the news
+window, half-life and saturation are in `lib/news.js`.
+
 ## Files
 
 - `api/webhook.js` — the Vercel serverless function Telegram calls on every message.
-- `lib/gemini.js` — calls the Gemini API with the note + instructions.
+- `lib/gemini.js` — calls the Gemini API (plain text or structured JSON).
+- `lib/keywords.js` — extracts keywords and computes the combined score.
+- `lib/news.js` — Google News RSS fetch, parsing, and news score.
+- `lib/history.js` — short per-chat conversation memory (`/new` resets it).
 - `lib/telegram.js` — sends replies back to Telegram (and splits long ones).
 - `config/instructions.md` — Meera's voice/style instructions. **Replace the
   placeholder content in this file with her real instructions** (or set them
