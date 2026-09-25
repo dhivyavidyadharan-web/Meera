@@ -11,7 +11,12 @@ const {
 const { getHistory, addTurns, clearHistory } = require("../lib/history");
 const { scoreKeywords, formatScoresHtml } = require("../lib/keywords");
 const { writePost, headlinePool } = require("../lib/draft");
-const { formatSourcesHtml, formatNeedsCheckingHtml } = require("../lib/sources");
+const {
+  formatSourcesHtml,
+  formatRelatedHtml,
+  formatNeedsCheckingHtml,
+  NO_NEWS_HTML,
+} = require("../lib/sources");
 
 const DIVIDER = "━━━━━━━━━━━━━━━━";
 const EXTRACT_BUDGET_MS = 15000;
@@ -106,23 +111,30 @@ async function handleUpdate(update) {
 
     await sendChatAction(chatId, "typing");
 
-    const { post, sources, needsChecking } = await writePost({
+    const headlines = scored ? headlinePool(scored.ranked, scored.main) : [];
+    const { post, sources, needsChecking, related } = await writePost({
       system: loadInstructions(),
       turns,
       note: text,
       topic: scored ? scored.main.keyword : "whatever Meera's note is about",
-      headlines: scored ? headlinePool(scored.ranked, scored.main) : [],
+      headlines,
       startedAt,
     });
 
     addTurns(chatId, { role: "user", text }, { role: "model", text: post });
 
+    const isPost = post.split(/\s+/).length >= 80;
     const sections = [];
     if (scored) sections.push(formatScoresHtml(scored.ranked, scored.main), DIVIDER);
     sections.push(escapeHtml(post));
-    if (sources.length || needsChecking.length) sections.push(DIVIDER);
-    if (sources.length) sections.push(formatSourcesHtml(sources));
+    if (isPost && scored) {
+      sections.push(DIVIDER);
+      if (sources.length) sections.push(formatSourcesHtml(sources));
+      if (related.length) sections.push(formatRelatedHtml(related, { anyCited: sources.length > 0 }));
+      if (!headlines.length) sections.push(NO_NEWS_HTML);
+    }
     if (needsChecking.length) sections.push(formatNeedsCheckingHtml(needsChecking));
+    sections.push(`<i>Drafted in ${Math.round((Date.now() - startedAt) / 1000)}s</i>`);
 
     await sendSections(chatId, sections, replyOpts);
   } catch (err) {
