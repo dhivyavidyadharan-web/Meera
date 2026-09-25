@@ -20,6 +20,7 @@ const {
 
 const DIVIDER = "━━━━━━━━━━━━━━━━";
 const EXTRACT_BUDGET_MS = 15000;
+const MIN_CITED_FOR_CLEAN_LAYOUT = 2;
 
 // Telegram re-sends an update if it doesn't get a 200 in time; don't draft it twice.
 const recentUpdateIds = new Set();
@@ -130,11 +131,14 @@ async function handleUpdate(update) {
     if (isPost && scored) {
       sections.push(DIVIDER);
       if (sources.length) sections.push(formatSourcesHtml(sources));
-      if (related.length) sections.push(formatRelatedHtml(related, { anyCited: sources.length > 0 }));
+      // Extra links only as a fallback, when the post didn't cite enough real articles.
+      if (sources.length < MIN_CITED_FOR_CLEAN_LAYOUT && related.length) {
+        sections.push(formatRelatedHtml(related, { anyCited: sources.length > 0 }));
+      }
       if (!headlines.length) sections.push(NO_NEWS_HTML);
     }
     if (needsChecking.length) sections.push(formatNeedsCheckingHtml(needsChecking));
-    sections.push(`<i>Drafted in ${Math.round((Date.now() - startedAt) / 1000)}s</i>`);
+    console.log(`Drafted in ${Math.round((Date.now() - startedAt) / 1000)}s`);
 
     await sendSections(chatId, sections, replyOpts);
   } catch (err) {
