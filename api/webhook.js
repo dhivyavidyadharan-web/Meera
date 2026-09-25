@@ -103,11 +103,13 @@ async function handleUpdate(update) {
     const turns = [...history, { role: "user", text }];
 
     let scored = null;
+    let scoringError = null;
     try {
       scored = await scoreKeywords(turns, { deadline: startedAt + EXTRACT_BUDGET_MS });
       if (scored.ranked.length === 0) scored = null;
     } catch (err) {
       console.error("Keyword scoring failed, drafting without news:", err);
+      scoringError = err;
     }
 
     await sendChatAction(chatId, "typing");
@@ -136,6 +138,11 @@ async function handleUpdate(update) {
         sections.push(formatRelatedHtml(related, { anyCited: sources.length > 0 }));
       }
       if (!headlines.length) sections.push(NO_NEWS_HTML);
+    }
+    if (scoringError && isPost) {
+      needsChecking.unshift(
+        `Keyword scoring and the Google News lookup failed, so this post has no scores or news sources (${String(scoringError.message).slice(0, 120)}). Send the note again.`
+      );
     }
     if (needsChecking.length) sections.push(formatNeedsCheckingHtml(needsChecking));
     console.log(`Drafted in ${Math.round((Date.now() - startedAt) / 1000)}s`);
