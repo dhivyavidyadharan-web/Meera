@@ -80,13 +80,14 @@ by a blank line.
 2. Turn: 1 sentence that says why the common belief or label is incomplete.
 3. Setup: 1-2 sentences naming how many things actually decide the outcome
    ("Two other things decide what reaches the pore.").
-4. Factors: 2-3 paragraphs, one per factor, each opening with "The first
-   is...", "The second is...", "The third is...". Each gives the mechanism
-   in plain words plus at most one number. Gloss any technical term in the
+4. Factors: exactly 2 paragraphs, one per factor, opening with "The first
+   is..." and "The second is...". Each is 2-3 sentences: the mechanism in
+   plain words plus at most one number. Gloss any technical term in the
    same sentence.
 5. Fairness: 1-2 sentences, "I'm not saying X. I'm saying Y."
-6. Skinstinct (optional): 1-2 sentences, only if Meera gave a real brand
-   detail, or to declare no stake ("We don't make a BHA product.").
+6. Skinstinct (optional): 1 sentence, only if Meera gave a real brand
+   detail, or to declare no stake ("We don't make a BHA product."). Leave
+   it out if the post is near the word limit.
 7. Action: 1-2 sentences. Something the reader can ask any brand, ending on
    a version of "If they can't answer, that's useful information."
 8. Closing question: the final line of the post is ONE genuine question to
@@ -98,8 +99,11 @@ by a blank line.
 
 Hard limits:
 - No paragraph over 3 sentences. No sentence over 25 words.
-- 280-420 words in total. Cut detail before breaking a limit; one precise
-  number per factor beats three.
+- 300-350 words in total, never more than 350. This is a LinkedIn post, not
+  a story or an essay: no background, no narrative build-up, no repeating a
+  point in different words. Budget about 15-17 sentences averaging under 20
+  words. Cut detail before breaking a limit; one precise number per factor
+  beats three.
 - Use a spaced hyphen " - " for asides, never an em dash.
 - If you add the optional "Note:" line, it comes after the post, on its own.
 
