@@ -1,3 +1,5 @@
+const { scoreKeywords } = require("../lib/keywords");
+
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 async function telegram(method, body) {
@@ -56,6 +58,23 @@ module.exports = async (req, res) => {
         : null,
       last_error_message: before.result?.last_error_message || null,
     };
+
+    if (req.query.test === "keywords") {
+      const t0 = Date.now();
+      try {
+        const { ranked, main } = await scoreKeywords([{ role: "user", text: "sunscreen for men" }], {
+          deadline: Date.now() + 20000,
+        });
+        report.keyword_test = {
+          ok: true,
+          ms: Date.now() - t0,
+          main: main?.keyword,
+          keywords: ranked.map((k) => `${k.keyword}: ${k.total} (${k.articleCount} articles)`),
+        };
+      } catch (err) {
+        report.keyword_test = { ok: false, ms: Date.now() - t0, kind: err.kind, error: String(err.message).slice(0, 500) };
+      }
+    }
 
     if (req.query.check === "1") {
       res.status(200).json(report);
