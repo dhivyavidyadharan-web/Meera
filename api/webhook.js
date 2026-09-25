@@ -14,6 +14,17 @@ const { writePost, headlinePool } = require("../lib/draft");
 const { formatSourcesHtml, formatNeedsCheckingHtml } = require("../lib/sources");
 
 const DIVIDER = "━━━━━━━━━━━━━━━━";
+const EXTRACT_BUDGET_MS = 15000;
+
+// Telegram re-sends an update if it doesn't get a 200 in time; don't draft it twice.
+const recentUpdateIds = new Set();
+function isDuplicate(updateId) {
+  if (updateId == null) return false;
+  if (recentUpdateIds.has(updateId)) return true;
+  recentUpdateIds.add(updateId);
+  if (recentUpdateIds.size > 200) recentUpdateIds.delete(recentUpdateIds.values().next().value);
+  return false;
+}
 
 let cachedInstructions = null;
 
@@ -42,6 +53,7 @@ async function sendSections(chatId, sections, replyOpts) {
 
 async function handleUpdate(update) {
   const startedAt = Date.now();
+  if (isDuplicate(update?.update_id)) return;
   const isChannel = Boolean(update?.channel_post);
   const message = update?.message || update?.edited_message || update?.channel_post;
   const chatId = message?.chat?.id;
@@ -86,7 +98,7 @@ async function handleUpdate(update) {
 
     let scored = null;
     try {
-      scored = await scoreKeywords(turns);
+      scored = await scoreKeywords(turns, { deadline: startedAt + EXTRACT_BUDGET_MS });
       if (scored.ranked.length === 0) scored = null;
     } catch (err) {
       console.error("Keyword scoring failed, drafting without news:", err);
@@ -115,11 +127,23 @@ async function handleUpdate(update) {
     await sendSections(chatId, sections, replyOpts);
   } catch (err) {
     console.error("Draft failed:", err);
-    await sendMessage(
-      chatId,
-      "Something went wrong drafting that one. Please try again in a minute.",
-      replyOpts
-    );
+    await sendMessage(chatId, explainError(err), replyOpts);
+  }
+}
+
+function explainError(err) {
+  switch (err?.kind) {
+    case "rate_limit":
+      return "Gemini's rate limit was hit, so I couldn't draft that one. The free Gemini tier allows only a few requests per minute (each note uses up to 5). Wait a minute, then send it again.";
+    case "time":
+      return "Gemini took too long to respond, so I stopped before Vercel's time limit. Please send the note again.";
+    case "bad_json":
+    case "empty":
+      return "Gemini sent back a reply I couldn't read. Please send the note again.";
+    case "api":
+      return `Gemini returned an error (${err.status || "no status"}). If this keeps happening, check the GEMINI_API_KEY in Vercel. Details: ${String(err.message).slice(0, 200)}`;
+    default:
+      return `Something went wrong drafting that one (${String(err?.message || err).slice(0, 150)}). Please try again in a minute.`;
   }
 }
 
