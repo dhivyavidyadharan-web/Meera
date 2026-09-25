@@ -29,8 +29,33 @@ For every note, the bot:
    around the top keyword using 1-2 relevant headlines as a timely hook, then
    sends the links for the headlines actually used.
 
+The post is always written around the keyword closest to what Meera asked
+about ("your topic" in the table), even if another keyword scores higher on
+news; higher-scoring keywords only supply supporting headlines.
+
 If a note has no clear topic, or Google News is unreachable, the bot skips
-scoring and drafts as before. Weights live in `lib/keywords.js`; the news
+scoring and drafts as before.
+
+## Source guardrails
+
+The only sources a post may cite are the real Google News RSS items fetched
+for that note (each must have a title, publisher and http(s) link). After
+drafting, `lib/sources.js` and `lib/draft.js`:
+
+1. **Verify citations in code.** Gemini must return the exact sentence that
+   cites each headline. A citation only counts if the headline exists, the
+   sentence is really in the post, and it names that publication.
+2. **Flag unbacked attribution.** Any sentence like "a study found",
+   "according to", "research shows", "experts say" that isn't a verified
+   citation is flagged.
+3. **Fact-check with Gemini.** Checks for claims beyond what a headline says,
+   invented sources, overclaims, hype words, and named competitor brands.
+4. **Revise once, then re-verify.** Whatever still fails is shown in a
+   **NEEDS CHECKING** section of the reply, never silently published.
+
+The **SOURCES** section lists only verified citations: the headline (links to
+the article via Google News), the publisher's site (link), and the exact
+sentence of the post that uses it, for quick cross-checking. Weights live in `lib/keywords.js`; the news
 window, half-life and saturation are in `lib/news.js`.
 
 ## Files
@@ -38,6 +63,9 @@ window, half-life and saturation are in `lib/news.js`.
 - `api/webhook.js` — the Vercel serverless function Telegram calls on every message.
 - `lib/gemini.js` — calls the Gemini API (plain text or structured JSON).
 - `lib/keywords.js` — extracts keywords and computes the combined score.
+- `lib/draft.js` — draft → verify → revise → re-verify pipeline.
+- `lib/sources.js` — citation checks, fact-check, SOURCES / NEEDS CHECKING output.
+- `lib/structure.js` — post structure limits (paragraph/sentence length, hook, closing question).
 - `lib/news.js` — Google News RSS fetch, parsing, and news score.
 - `lib/history.js` — short per-chat conversation memory (`/new` resets it).
 - `lib/telegram.js` — sends replies back to Telegram (and splits long ones).
